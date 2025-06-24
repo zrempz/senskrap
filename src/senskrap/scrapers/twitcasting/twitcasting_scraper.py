@@ -1,7 +1,12 @@
-from typing import Dict, List, Optional, Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
+
 from senskrap.base import BaseScraper
-from aiohttp import ClientSession
+
+if TYPE_CHECKING:
+    from aiohttp import ClientSession
 
 
 class TwitcastingScraper(BaseScraper):
@@ -10,10 +15,10 @@ class TwitcastingScraper(BaseScraper):
     def __init__(
         self,
         endpoint: str,
-        user_agent: Optional[Union[str, List[str]]] = None,
-        session: Optional[ClientSession] = None,
-        proxies: Optional[Union[str, List[str]]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        user_agent: str | list[str] | None = None,
+        session: ClientSession | None = None,
+        proxies: str | list[str] | None = None,
+        headers: dict[str, str] | None = None,
         timeout: int = 10,
     ) -> None:
         super().__init__(

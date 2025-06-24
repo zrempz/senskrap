@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "senskrap"
+dynamic = ["version"]
+description = 'A general-purpose, asynchronous web scraping library with a focus on specific platforms.'
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = ["scraping", "scraper", "asyncio", "twitcasting", "web-scraping", "parser", "aiohttp"]
+authors = [
+  { name = "zrempz" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "aiohttp-socks",
+  "beautifulsoup4",
+  "lxml",
+]
+
+[project.urls]
+Documentation = "https://github.com/zrempz/senskrap#readme"
+Issues = "https://github.com/zrempz/senskrap/issues"
+Source = "https://github.com/zrempz/senskrap"
+
+[tool.hatch.version]
+path = "src/senskrap/__about__.py"
+
+[tool.hatch.envs.default]
+dependencies = [
+]
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/senskrap tests}"
+
+[tool.coverage.run]
+source_pkgs = ["senskrap", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/senskrap/__about__.py",
+]
+
+[tool.coverage.paths]
+senskrap = ["src/senskrap", "*/senskrap/src/senskrap"]
+tests = ["tests", "*/senskrap/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]

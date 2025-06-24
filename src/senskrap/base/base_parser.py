@@ -1,9 +1,11 @@
-from abc import abstractmethod
-from typing import Any, List, Optional, Set
-from urllib.parse import urljoin
-from bs4 import Tag
-from copy import copy
+from __future__ import annotations
 
+from abc import abstractmethod
+from copy import copy
+from typing import Any
+from urllib.parse import urljoin
+
+from bs4 import Tag
 from bs4.element import NavigableString
 
 
@@ -11,7 +13,7 @@ class BaseParser:
     """Base class for parsers with utility methods."""
 
     @staticmethod
-    def extract_text(element: Optional[Tag], strip: bool = True) -> Optional[str]:
+    def extract_text(element: Tag | None, *, strip: bool = True) -> str | None:
         """
         Safely extracts text from a BeautifulSoup tag.
 
@@ -25,9 +27,7 @@ class BaseParser:
         return element.get_text(strip=strip) if element else None
 
     @staticmethod
-    def extract_with_line_breaks(
-        element: Optional[Tag], strip: bool = False
-    ) -> Optional[str]:
+    def extract_with_line_breaks(element: Tag | None, *, strip: bool = False) -> str | None:
         """
         Extracts readable text from a BeautifulSoup tag, mimicking page formatting
         with line breaks after block elements like <p>, <br>, <div>, etc.
@@ -45,8 +45,8 @@ class BaseParser:
             return None
         element_copy = copy(element)
 
-        br_tags: Set[str] = {"br"}
-        block_tags: Set[str] = {
+        br_tags: set[str] = {"br"}
+        block_tags: set[str] = {
             "p",
             "div",
             "li",
@@ -70,13 +70,10 @@ class BaseParser:
         if strip:
             lines = (line.strip() for line in text.splitlines())
             return "\n".join(line for line in lines if line)
-        else:
-            return text.strip()
+        return text.strip()
 
     @staticmethod
-    def extract_urls(
-        elements: List[Tag], attr: str = "href", base_url: Optional[str] = None
-    ) -> List[str]:
+    def extract_urls(elements: list[Tag], attr: str = "href", base_url: str | None = None) -> list[str]:
         """
         Extract URLs from elements by specified attribute, resolving relative URLs if base_url provided.
 
@@ -88,16 +85,21 @@ class BaseParser:
         Returns:
             List of URLs as strings.
         """
-        return [
-            url
-            for el in elements
-            if (url := BaseParser.extract_url(el, attr, base_url))
-        ]
+        return [url for el in elements if (url := BaseParser.extract_url(el, attr=attr, base_url=base_url))]
 
     @staticmethod
-    def extract_url(
-        element: Tag, attr: str = "href", base_url: Optional[str] = None
-    ) -> Optional[str]:
+    def extract_url(element: Tag, attr: str = "href", base_url: str | None = None) -> str | None:
+        """
+        Extracts a single URL from an element.
+
+        Args:
+            element: The HTML element.
+            attr: The attribute to extract the URL from.
+            base_url: The base URL for resolving relative paths.
+
+        Returns:
+            The full URL as a string, or None.
+        """
         url = element.get(attr)
         if not url:
             return None
@@ -117,4 +119,3 @@ class BaseParser:
         Returns:
             Any: The result of the parsing operation.
         """
-        pass

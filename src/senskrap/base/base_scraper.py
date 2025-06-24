@@ -1,9 +1,14 @@
-from types import TracebackType
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from secrets import choice
+from typing import TYPE_CHECKING, Any, Self
+
 from aiohttp import ClientSession, ClientTimeout
 from aiohttp_socks import ProxyConnector
-from abc import ABC, abstractmethod
-from random import choice
-from typing import Any, Dict, Optional, Self, Type, Union, List
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 
 class BaseScraper(ABC):
@@ -44,10 +49,10 @@ class BaseScraper(ABC):
     def __init__(
         self,
         url: str,
-        user_agent: Optional[Union[str, List[str], bool]] = None,
-        session: Optional[ClientSession] = None,
-        proxies: Optional[Union[str, List[str]]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        user_agent: str | list[str] | bool | None = None,
+        session: ClientSession | None = None,
+        proxies: str | list[str] | None = None,
+        headers: dict[str, str] | None = None,
         timeout: int = 10,
     ) -> None:
         """Initialize web scraper instance.
@@ -63,21 +68,17 @@ class BaseScraper(ABC):
         self.url = url
         self._session = session
         self._external_session = session is not None
-        self._internal_session: Optional[ClientSession] = None
-        self._headers = (
-            self._build_headers(user_agent, headers)
-            if not self._external_session
-            else None
-        )
+        self._internal_session: ClientSession | None = None
+        self._headers = self._build_headers(user_agent, headers) if not self._external_session else None
         self._proxy_url = self._resolve_proxy_url(proxies)
         self._closed = False
         self.timeout = timeout
 
     def _build_headers(
         self,
-        user_agent: Optional[Union[str, List[str], bool]],
-        headers: Optional[Dict[str, str]],
-    ) -> Dict[str, str]:
+        user_agent: str | list[str] | bool | None,
+        headers: dict[str, str] | None,
+    ) -> dict[str, str]:
         """Merge base headers with custom headers and resolved User-Agent.
 
         Returns:
@@ -91,9 +92,7 @@ class BaseScraper(ABC):
 
         return headers
 
-    def _resolve_user_agent(
-        self, user_agent: Optional[Union[str, List[str], bool]]
-    ) -> str:
+    def _resolve_user_agent(self, user_agent: str | list[str] | bool | None) -> str:
         """Select User-Agent string from available options.
 
         Returns:
@@ -105,9 +104,7 @@ class BaseScraper(ABC):
             return choice(user_agent)
         return choice(self._DEFAULT_USER_AGENTS)
 
-    def _resolve_proxy_url(
-        self, proxies: Optional[Union[str, List[str]]]
-    ) -> Optional[str]:
+    def _resolve_proxy_url(self, proxies: str | list[str] | None) -> str | None:
         """Select proxy URL from provided options.
 
         Returns:
@@ -119,8 +116,9 @@ class BaseScraper(ABC):
             return proxies
         if isinstance(proxies, list):
             return choice(proxies)
+        return None
 
-    def _create_connector(self) -> Optional[ProxyConnector]:
+    def _create_connector(self) -> ProxyConnector | None:
         """Create proxy connector if proxy URL is valid."""
         if not self._proxy_url:
             return None
@@ -151,13 +149,13 @@ class BaseScraper(ABC):
         Returns:
             bool: Scraping success status
         """
-        pass
 
     async def fetch(
         self,
-        url: Optional[str] = None,
+        url: str | None = None,
         method: str = "GET",
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
+        *,
         allow_redirects: bool = True,
         **kwargs: Any,
     ) -> str:
@@ -187,10 +185,10 @@ class BaseScraper(ABC):
                 return await response.text()
         except Exception as e:
             if hasattr(e, "status"):
-                raise ConnectionError(f"HTTP error {e} for URL: {url}") from e
-            raise ConnectionError(
-                f"Network error occurred: {str(e)} for URL: {url}"
-            ) from e
+                msg = f"HTTP error {e} for URL: {url}"
+                raise ConnectionError(msg) from e
+            msg = f"Network error occurred: {e!s} for URL: {url}"
+            raise ConnectionError(msg) from e
 
     async def fetch_html(self, **kwargs) -> str:
         """Alias for fetch() with HTML-specific naming."""
@@ -212,9 +210,9 @@ class BaseScraper(ABC):
 
     async def __aexit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         """Async context manager exit point.
 
