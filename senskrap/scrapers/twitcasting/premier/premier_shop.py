@@ -3,11 +3,20 @@ from typing import Any, Dict, List, Optional, Union
 from aiohttp import ClientSession
 from datetime import datetime
 
-from .premier_parser import ItemParser, ListParser
 from ..twitcasting_scraper import TwitcastingScraper
+from .premier_item import PremierItem
+from .premier_parser import ItemParser, ListParser
+from .premier_genre import PremierGenre
 
 
 class PremierScraper(TwitcastingScraper):
+    """
+    A scraper for fetching data about Premier broadcasts from Twitcasting.
+
+    This class provides methods to search for broadcast URLs by various criteria
+    and to scrape detailed information from those URLs.
+    """
+
     def __init__(
         self,
         user_agent: Optional[Union[str, List[str]]] = None,
@@ -16,6 +25,16 @@ class PremierScraper(TwitcastingScraper):
         headers: Optional[Dict[str, str]] = None,
         timeout: int = 10,
     ) -> None:
+        """
+        Initializes the PremierScraper.
+
+        Args:
+            user_agent: The User-Agent string or a list of strings to rotate through.
+            session: An optional aiohttp.ClientSession to use for requests.
+            proxies: An optional proxy URL or a list of URLs to rotate through.
+            headers: Optional dictionary of headers to include in every request.
+            timeout: The default timeout in seconds for requests.
+        """
         super().__init__(
             endpoint="shop.php",
             user_agent=user_agent,
@@ -27,15 +46,143 @@ class PremierScraper(TwitcastingScraper):
         self.list_parser = ListParser()
         self.item_parser = ItemParser()
 
-    async def scrape(self, *args: Any, **kwargs: Any) -> Any:
-        pass
-
-    async def scrape_urls(
+    async def scrape(
         self,
-        payload: Dict[str, Any],
+        *,
+        search: Optional[str] = None,
+        date: Optional[datetime] = None,
+        genre: Optional[PremierGenre] = None,
+        max_pages: Optional[int] = None,
+        concurrency: int = 10,
+        strip: bool = False,
+    ) -> List[dict]:
+        """
+        A generic scraper that gets full item data based on a single search criterion.
+
+        This is the primary method for getting detailed data. It first finds all
+        relevant URLs and then concurrently scrapes each one.
+
+        Args:
+            search: The search term to query.
+            date: The specific date to query.
+            genre: The specific genre to query.
+            max_pages: The maximum number of result pages to process.
+            concurrency: The number of concurrent requests for scraping details.
+            strip: If True, strips extra whitespace from string fields in the result.
+
+        Returns:
+            A list of dictionaries, where each dictionary represents a scraped item.
+
+        Raises:
+            ValueError: If more than one or zero search criteria are provided.
+        """
+        urls = await self.search(
+            search=search,
+            date=date,
+            genre=genre,
+            max_pages=max_pages,
+            concurrency=concurrency,
+        )
+        return await self._scrape_items_from_urls(urls, concurrency, strip)
+
+    async def search(
+        self,
+        *,
+        search: Optional[str] = None,
+        date: Optional[datetime] = None,
+        genre: Optional[PremierGenre] = None,
         max_pages: Optional[int] = None,
         concurrency: int = 10,
     ) -> List[str]:
+        """
+        A generic search that gets item URLs based on a single search criterion.
+
+        This method is for discovering URLs without fetching their full details.
+
+        Args:
+            search: The search term to query.
+            date: The specific date to query.
+            genre: The specific genre to query.
+            max_pages: The maximum number of result pages to process.
+            concurrency: The number of concurrent requests for fetching result pages.
+
+        Returns:
+            A list of URLs matching the search criterion.
+
+        Raises:
+            ValueError: If more than one or zero search criteria are provided.
+        """
+        payload = {}
+        criteria = [c for c in (search, date, genre) if c is not None]
+        if len(criteria) != 1:
+            raise ValueError(
+                "Exactly one search criterion (search, date, or genre) must be provided."
+            )
+
+        if search is not None:
+            payload = {"search": search}
+        elif date is not None:
+            payload = {"date": date.strftime("%Y%m%d")}
+        elif genre is not None:
+            payload = {"genre": genre.value}
+
+        return await self._scrape_urls(payload, max_pages, concurrency)
+
+    async def get_item_info(self, url: str, strip: bool = False) -> Optional[dict]:
+        """
+        Fetches a single item's page and returns its data as a dictionary.
+
+        Args:
+            url: The full URL of the item page to scrape.
+            strip: If True, strips extra whitespace from string fields in the result.
+
+        Returns:
+            A dictionary containing the scraped item data, or None if scraping fails.
+        """
+        item = await self._get_premier_item(url=url, strip=strip)
+        return item.to_dict() if item else None
+
+    async def scrape_by_term(self, search: str, **kwargs) -> List[dict]:
+        """Convenience wrapper to scrape all items by a search term."""
+        return await self.scrape(search=search, **kwargs)
+
+    async def scrape_by_date(self, date: datetime, **kwargs) -> List[dict]:
+        """Convenience wrapper to scrape all items by a specific date."""
+        return await self.scrape(date=date, **kwargs)
+
+    async def scrape_by_genre(self, genre: PremierGenre, **kwargs) -> List[dict]:
+        """Convenience wrapper to scrape all items by a specific genre."""
+        return await self.scrape(genre=genre, **kwargs)
+
+    async def search_by_term(self, search: str, **kwargs) -> List[str]:
+        """Convenience wrapper to find all item URLs by a search term."""
+        return await self.search(search=search, **kwargs)
+
+    async def search_by_date(self, date: datetime, **kwargs) -> List[str]:
+        """Convenience wrapper to find all item URLs by a specific date."""
+        return await self.search(date=date, **kwargs)
+
+    async def search_by_genre(self, genre: PremierGenre, **kwargs) -> List[str]:
+        """Convenience wrapper to find all item URLs by a specific genre."""
+        return await self.search(genre=genre, **kwargs)
+
+    async def _get_premier_item(
+        self, url: str, strip: bool = False
+    ) -> Optional[PremierItem]:
+        """Fetches and parses a single item page, returning a PremierItem object."""
+        try:
+            html = await self.fetch(url=url)
+            if not html:
+                return None
+            return self.item_parser.parse(html, url=url, strip=strip)
+        except Exception as e:
+            print(f"Error getting information from {url}: {e}")
+            return None
+
+    async def _scrape_urls(
+        self, payload: Dict[str, Any], max_pages: Optional[int], concurrency: int
+    ) -> List[str]:
+        """Fetches all item URLs from paginated search results."""
         try:
             initial_html = await self.fetch_html(params=payload)
             if not initial_html:
@@ -46,67 +193,57 @@ class PremierScraper(TwitcastingScraper):
 
         all_links, actual_total_pages = self.list_parser.parse(initial_html)
 
-        pages_to_scrape = actual_total_pages
-        if max_pages is not None:
-            pages_to_scrape = min(actual_total_pages, max_pages)
+        pages_to_scrape = (
+            min(actual_total_pages, max_pages)
+            if max_pages is not None
+            else actual_total_pages
+        )
 
         if pages_to_scrape <= 1:
             return all_links
 
         semaphore = Semaphore(concurrency)
-        tasks = []
-
-        async def fetch_page_links(page_num: int) -> List[str]:
-            async with semaphore:
-                try:
-                    html = await self.fetch_html(params={**payload, "p": page_num})
-                    links, _ = self.list_parser.parse(html)
-                    return links
-                except Exception as e:
-                    print(
-                        f"Error getting links from page {page_num} with params {payload}: {e}"
-                    )
-                    return []
-
-        for page_num in range(1, pages_to_scrape):
-            tasks.append(fetch_page_links(page_num))
-
+        tasks = [
+            self._fetch_page_links(page_num, payload, semaphore)
+            for page_num in range(1, pages_to_scrape)
+        ]
         results_from_other_pages = await gather(*tasks)
+
         for page_links in results_from_other_pages:
             all_links.extend(page_links)
 
         return all_links
 
-    async def search_by_term(
-        self,
-        search: str,
-        max_pages: Optional[int] = None,
-        concurrency: int = 10,
+    async def _fetch_page_links(
+        self, page_num: int, payload: Dict[str, Any], semaphore: Semaphore
     ) -> List[str]:
-        """Wrapper to search by term with pagination control."""
-        payload = {"search": search}
-        return await self.scrape_urls(
-            payload, max_pages=max_pages, concurrency=concurrency
-        )
+        """Fetches and parses a single page of search results for item URLs."""
+        async with semaphore:
+            try:
+                html = await self.fetch_html(params={**payload, "p": page_num})
+                links, _ = self.list_parser.parse(html)
+                return links
+            except Exception as e:
+                print(
+                    f"Error getting links from page {page_num} with params {payload}: {e}"
+                )
+                return []
 
-    async def search_by_date(
-        self,
-        date: datetime,
-        max_pages: Optional[int] = None,
-        concurrency: int = 10,
-    ) -> List[str]:
-        """Wrapper to search by date with pagination control."""
-        payload = {"date": date.strftime("%Y%m%d")}
-        return await self.scrape_urls(
-            payload, max_pages=max_pages, concurrency=concurrency
-        )
+    async def _scrape_items_from_urls(
+        self, urls: List[str], concurrency: int, strip: bool = False
+    ) -> List[dict]:
+        """Concurrently scrapes item details from a list of URLs."""
+        if not urls:
+            return []
 
-    async def get_item_details(self, url: str, strip: bool = False) -> Optional[dict]:
-        try:
-            html = await self.fetch(url=url)
-            if not html:
-                return None
-            return self.item_parser.parse(html, url=url, strip=strip).to_dict()
-        except Exception as e:
-            print(f"Error getting information from {url}: {e}")
-            return None
+        semaphore = Semaphore(concurrency)
+
+        tasks = [self.get_item_info(url, strip) for url in urls]
+
+        async def run_with_semaphore(task):
+            async with semaphore:
+                return await task
+
+        results = await gather(*(run_with_semaphore(task) for task in tasks))
+
+        return [item for item in results if item is not None]

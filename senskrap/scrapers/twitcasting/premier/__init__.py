@@ -1,3 +1,4 @@
-__all__ = ["PremierScraper"]
+__all__ = ["PremierScraper", "PremierGenre"]
 
 from .premier_shop import PremierScraper
+from .premier_genre import PremierGenre

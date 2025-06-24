@@ -1,3 +1,4 @@
-__all__ = ["TwitcastingPremier"]
+__all__ = ["TwitcastingPremier", "PremierGenre"]
 
 from .premier import PremierScraper as TwitcastingPremier
+from .premier import PremierGenre
