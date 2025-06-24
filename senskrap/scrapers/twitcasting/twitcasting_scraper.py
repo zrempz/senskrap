@@ -1,9 +1,10 @@
 from typing import Dict, List, Optional, Union
+from urllib.parse import urljoin
 from senskrap.base import BaseScraper
 from aiohttp import ClientSession
 
 
-class TwitcastingBase(BaseScraper):
+class TwitcastingScraper(BaseScraper):
     _BASE_URL = "https://twitcasting.tv"
 
     def __init__(
@@ -16,7 +17,7 @@ class TwitcastingBase(BaseScraper):
         timeout: int = 10,
     ) -> None:
         super().__init__(
-            url=f"{self._BASE_URL}/{endpoint}",
+            url=urljoin(self._BASE_URL, endpoint),
             user_agent=user_agent,
             session=session,
             proxies=proxies,

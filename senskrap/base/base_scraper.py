@@ -5,8 +5,6 @@ from abc import ABC, abstractmethod
 from random import choice
 from typing import Any, Dict, Optional, Self, Type, Union, List
 
-from bs4 import Tag
-
 
 class BaseScraper(ABC):
     """Abstract base class for web scraping implementations.
@@ -147,7 +145,7 @@ class BaseScraper(ABC):
         return self._internal_session
 
     @abstractmethod
-    async def scrape(self, **kwargs: Any) -> Any:
+    async def scrape(self, *args: Any, **kwargs: Any) -> Any:
         """Implement scraping logic in derived classes.
 
         Returns:
@@ -197,19 +195,6 @@ class BaseScraper(ABC):
     async def fetch_html(self, **kwargs) -> str:
         """Alias for fetch() with HTML-specific naming."""
         return await self.fetch(**kwargs)
-
-    def _extract_text(self, element: Optional[Tag], strip: bool = True) -> Optional[str]:
-        """Safely extract and strip text from a BeautifulSoup element."""
-        return element.get_text(strip=strip) if element else None
-
-    def _extract_with_line_breaks(
-        self, element: Optional[Tag], strip: bool = True
-    ) -> Optional[str]:
-        """
-        Extracts text, using newlines as separators for tags like <br>.
-        This is the recommended, non-destructive method.
-        """
-        return element.get_text(separator="\n", strip=strip) if element else None
 
     async def close(self) -> None:
         """Clean up internal resources."""
