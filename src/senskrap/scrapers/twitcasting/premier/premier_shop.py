@@ -5,16 +5,16 @@ from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientError
 
-from senskrap.scrapers.twitcasting.premier.premier_parser import ItemParser, ListParser
-from senskrap.scrapers.twitcasting.twitcasting_scraper import TwitcastingScraper
+from .premier_parser import ItemParser, ListParser
+from ..twitcasting_scraper import TwitcastingScraper
 
 if TYPE_CHECKING:
     from datetime import datetime
 
     from aiohttp import ClientSession
 
-    from senskrap.scrapers.twitcasting.premier.premier_genre import PremierGenre
-    from senskrap.scrapers.twitcasting.premier.premier_item import PremierItem
+    from .premier_genre import PremierGenre
+    from .premier_item import PremierItem
 
 
 class PremierScraper(TwitcastingScraper):
@@ -173,7 +173,9 @@ class PremierScraper(TwitcastingScraper):
         """Convenience wrapper to find all item URLs by a specific genre."""
         return await self.search(genre=genre, **kwargs)
 
-    async def _get_premier_item(self, url: str, *, strip: bool = False) -> PremierItem | None:
+    async def _get_premier_item(
+        self, url: str, *, strip: bool = False
+    ) -> PremierItem | None:
         """Fetches and parses a single item page, returning a PremierItem object."""
         try:
             html = await self.fetch(url=url)
@@ -183,7 +185,9 @@ class PremierScraper(TwitcastingScraper):
         except (ClientError, TypeError, TimeoutError):
             return None
 
-    async def _scrape_urls(self, payload: dict[str, Any], max_pages: int | None, concurrency: int) -> list[str]:
+    async def _scrape_urls(
+        self, payload: dict[str, Any], max_pages: int | None, concurrency: int
+    ) -> list[str]:
         """Fetches all item URLs from paginated search results."""
         try:
             initial_html = await self.fetch_html(params=payload)
@@ -194,13 +198,20 @@ class PremierScraper(TwitcastingScraper):
 
         all_links, actual_total_pages = self.list_parser.parse(initial_html)
 
-        pages_to_scrape = min(actual_total_pages, max_pages) if max_pages is not None else actual_total_pages
+        pages_to_scrape = (
+            min(actual_total_pages, max_pages)
+            if max_pages is not None
+            else actual_total_pages
+        )
 
         if pages_to_scrape <= 1:
             return all_links
 
         semaphore = Semaphore(concurrency)
-        tasks = [self._fetch_page_links(page_num, payload, semaphore) for page_num in range(1, pages_to_scrape)]
+        tasks = [
+            self._fetch_page_links(page_num, payload, semaphore)
+            for page_num in range(1, pages_to_scrape)
+        ]
         results_from_other_pages = await gather(*tasks)
 
         for page_links in results_from_other_pages:
@@ -208,7 +219,9 @@ class PremierScraper(TwitcastingScraper):
 
         return all_links
 
-    async def _fetch_page_links(self, page_num: int, payload: dict[str, Any], semaphore: Semaphore) -> list[str]:
+    async def _fetch_page_links(
+        self, page_num: int, payload: dict[str, Any], semaphore: Semaphore
+    ) -> list[str]:
         """Fetches and parses a single page of search results for item URLs."""
         async with semaphore:
             try:
@@ -219,7 +232,9 @@ class PremierScraper(TwitcastingScraper):
             else:
                 return links
 
-    async def _scrape_items_from_urls(self, urls: list[str], concurrency: int, *, strip: bool = False) -> list[dict]:
+    async def _scrape_items_from_urls(
+        self, urls: list[str], concurrency: int, *, strip: bool = False
+    ) -> list[dict]:
         """Concurrently scrapes item details from a list of URLs."""
         if not urls:
             return []

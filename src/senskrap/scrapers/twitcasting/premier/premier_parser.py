@@ -4,11 +4,11 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from senskrap.scrapers.twitcasting.premier.premier_item import (
+from .premier_item import (
     PremierItem,
     PremierTicket,
 )
-from senskrap.scrapers.twitcasting.twitcasting_parser import TwitcastingParser
+from ..twitcasting_parser import TwitcastingParser
 
 
 class ListParser(TwitcastingParser):
